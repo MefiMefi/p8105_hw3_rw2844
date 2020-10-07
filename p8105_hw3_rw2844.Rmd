@@ -1,0 +1,315 @@
+---
+title: "p8105_hw3_rw2844"
+author: "Renjie Wei"
+date: "2020/10/5"
+output: github_document
+---
+
+```{r setup, include = FALSE}
+library(tidyverse)
+library(patchwork)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE
+	#fig.width = 10, 
+  #fig.height = 8,
+  #out.width = "90%"
+)
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+options(
+  ggplot2.continuous.colour = "viridis", 
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+# Problem 1
+
+Read the instacart data:
+```{r datalaoding, results = FALSE}
+# read the dataset
+library(p8105.datasets)
+data("instacart")
+#check variables types
+str(instacart)
+```
+The`instracart` dataframe has `r nrow(instacart)` observations and `r ncol(instacart)` variables. The key variables are: 
+
+* `reordered`: if the customer has ordered this item before. 1 for "Yes" and 0 for "No" 
+* `order_number`: the number of times of this user to shop here.     
+* `product` and `aisle`: the item customer bought and the aisle of that product.        
+*`department`: groups of products.     
+*`order_dow`: the day of the week which the item is ordered (0 for "Sunday", which is confusing).     
+*`order_hour_of_the_day`: the hour of the day which this item is ordered.
+
+## "popular" aisles
+
+```{r instracart_manipulate}
+#manipulating data
+instacart_df = 
+  instacart %>% 
+  mutate(
+    reordered = factor(reordered, labels = c("No","Yes")),
+    aisle = as.factor(aisle),
+    order_dow = 
+      factor(
+      order_dow, 
+      labels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+      ),
+    department = as.factor(department)
+    )
+```
+
+```{r top_aisles}
+# top 10 aisles
+instacart_df %>%
+  count(aisle, name = "n_items_ordered") %>% 
+  arrange(desc(n_items_ordered)) %>% 
+  head(n = 5) %>% 
+  knitr::kable()
+```
+
+There are  `r nlevels(pull(instacart_df,aisle))` aisles in the store. And the table above shows the top 5 ordered aisles.       
+
+## aisles with more than 10000 items
+```{r pop_aisle}
+instacart_df %>% 
+  count(aisle, name = "n_items_ordered") %>% 
+  # use a filter to find aisles with more than 10000 items ordered.
+  arrange(desc(n_items_ordered)) %>% 
+  filter(n_items_ordered > 10000) %>% 
+  # reorder aisle
+  mutate(rank = c(1: length(aisle) ),
+         aisle = fct_reorder(aisle, rank))%>%
+  ggplot(aes(x = rank, y = n_items_ordered, color = aisle)) + 
+  geom_point(aes(size = n_items_ordered)) +
+  labs(
+    title = "Aisles with more than 10000 items ordered",
+    x = "Rank",
+    y = "Items",
+    color = "Aisles"
+    )+
+  scale_x_continuous(
+    breaks = c(seq(1, 40, by = 1)),
+    labels = c(seq(1, 40, by = 1))
+  )
+```
+I think a this plot is useful to describe those aisles that has more than 10,000 items ordered (too much). And a decreasing order may be easy for us to read.
+
+## popular items in three aisles
+```{r specific_aisle}
+instacart_df %>% 
+# pick the three most popular aisles, and focus on the target items.
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>% 
+  group_by(aisle) %>% 
+  count(product_name) %>% 
+  mutate(rank = min_rank(desc(n))) %>% 
+  filter(rank < 4) %>% 
+  arrange(aisle, rank) %>%
+  knitr::kable()
+```
+The top three popular products in the specific aisle are shown in the table above. 
+
+## Pink Lady Apples and Coffee Ice Cream
+```{r filter_prdct}
+instacart_df %>%
+  # filter two interested products
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>% 
+  group_by(product_name, order_dow) %>% 
+  # summarize the mean hour of the day ordered
+  summarize(mean_hour = mean(order_hour_of_day)) %>% 
+  pivot_wider(
+    names_from = order_dow,
+    values_from = mean_hour
+  ) %>% 
+  knitr::kable(digits = 2)
+```
+
+The number indicates the mean hour of the day in which is this product bought(may be better to round it to integer).
+
+
+# Problem 2
+
+## Clean and describe the data
+
+Read and clean the data.
+```{r acc_df}
+# read in and clear the form
+acc_df = 
+  read.csv("data/accel_data.csv", header = T) %>% 
+  janitor::clean_names() %>% 
+  # something must be cleaned 
+  pivot_longer(
+    activity_1:activity_1440,
+    names_to = "minute",
+    values_to = "activity"
+  ) %>%
+  separate(minute, into = c("act","minute"),sep = "_") %>%
+  mutate(
+    week = as.factor(week),
+    day = factor(day, levels = c("Sunday", "Monday", "Tuesday", "Wednesday","Thursday", "Friday", "Saturday")),
+    day_type = if_else(day %in% c("Saturday", "Sunday"),"weekend","weekday"),
+    day_type = as.factor(day_type), 
+    minute = as.numeric(minute),
+    activity = round(activity) 
+    ) %>% 
+  select(week,day_id,day,day_type,minute,activity)
+
+acc_df
+```
+
+The `acc_df` has `r nrow(acc_df)` rows and `r ncol(acc_df)` of variables. Variables are `r colnames(acc_df)`:
+
+`week`:the week of the observation, from 1- 5.
+
+`day_id`: the  id of the day of the observation, from 1 to 35 
+
+`day`:the name of the day of the week, from Sunday to Saturday
+
+`day_type`: indicate the status of weekday/weekend.
+
+`activity`: indicates the subject's activity status at that minute.
+
+`minute`: the exact minute of the day of observation, from 1 to 1440. 
+## Aggregate accross minutes
+
+```{r agg_acc}
+acc_df %>% 
+  group_by(week,day) %>% 
+  summarize(day_activity_sum = sum(activity)) %>%
+  pivot_wider(
+    id_cols = "week",
+    names_from = "day",
+    values_from = "day_activity_sum"
+  ) %>% 
+  knitr::kable()
+```
+
+  
+There is a increasing activity minutes from Monday to Friday in the first three weeks. And a decrease of activity time from Friday to Saturday. However, from week 4 to week 5, the activity counts drop from weekday to weekend become much bigger.
+
+## Make a plot using the data
+```{r confusing_}
+acc_df %>%
+  group_by(day, minute) %>% 
+  summarize(activity_sum = sum(activity)) %>% 
+  ggplot(aes(x = minute ,y = activity_sum, color = day)) +
+  geom_point(alpha = .2, size = 1) +
+  # for a better and more simple plot, I choose to hide the CI
+  stat_smooth(se = FALSE) +
+  labs(
+    title = "Activity in 24 hours",
+    x = "Hour",
+    y = "Activity value",
+    color = "Day of the week"
+    ) +
+  scale_x_continuous(
+    breaks = c(seq(0, 1440, by = 60)),
+    labels = c(seq(0, 24, by = 1))
+  )
+```
+We can found that there are 2 peaks in the plot above, one is on Sunday Morning and the other one is on Friday Night. And he goes to bed on 23PM and wakes up at 5AM since the activity counts during this period is very low. 
+
+
+# Problem 3
+
+Load the `ny_noaa` dataset:
+```{r dataloading_2}
+library(p8105.datasets)
+data("ny_noaa")
+str(ny_noaa)
+
+# EXTENSIVE MISSING DATA
+```
+The`ny_noaa` dataframe has `r nrow(ny_noaa)` observations and `r ncol(ny_noaa)` variables. The key variables are: 
+
+* `date`: Date of observation.   
+* `prcp`: Precipitation(tenths of mm).      
+* `snow`: Snowfall(mm).     
+* `snwd`: Snow depth(mm).     
+* `tmax` and `tmin`: Maximum and minimum temperature(tenths of degree Celsius).
+
+Since each weather station may collect only a subset of these variables, the resulting dataset contains extensive missing data. There is total `r sum(is.na(ny_noaa))` missing values.
+
+## Clean the dataset
+```{r clean_ny_noaa}
+weather_df = 
+  ny_noaa %>% 
+  separate(date, into = c("year","month","day"),sep = "-") %>% 
+  mutate(
+    year = as.factor(year),
+    month = as.integer(month),
+    month = (month.name[month]),
+    day = as.factor(day),
+    prcp = prcp / 10,
+    tmax = as.numeric(tmax),
+    tmin = as.numeric(tmin),
+    tmax = tmax / 10,
+    tmin = tmin / 10
+  ) 
+#make a table shows the most common observations of snowfall
+weather_df %>% 
+  count(snow, name = "n_of_observations") %>% 
+  drop_na(snow) %>% 
+  arrange(desc(n_of_observations)) %>% 
+  head(n = 5) %>% 
+  knitr::kable()
+   
+```
+The most observed values are `0` , `25` and `13`, that means there are few snowy days in New York.
+
+## Average max temperature in Jan and Jul
+
+```{r jan_jul}
+weather_df %>%
+  #focus on Jan and Jul
+  filter(month %in% c("January", "July")) %>% 
+  group_by(year, month, id) %>% 
+  summarise(mean_of_tmax = mean(tmax,na.rm = TRUE)) %>% 
+  ggplot(aes(x = year ,y = mean_of_tmax)) + 
+  geom_boxplot(aes(fill = year)) +
+  facet_grid(.~month) +
+  labs(
+    title = "Mean max temperature in New York, Janurary and July",
+    x = "Year",
+    y = "Mean Temperature(℃)",
+    caption = "data from NOAA National Climatic Data Center"
+  ) +
+  theme(legend.position = "none")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+
+## tmax vs tmin and snowfall by year
+```{r tmax_tmin_snw}
+tmax_tmin =
+  weather_df %>%
+  ggplot(aes(x = tmax, y = tmin)) +
+  geom_bin2d() +
+    labs(
+    title = "Max vs Min Temperature",
+    x = "Max temperature (℃)",
+    y = "Min temperature (℃)",
+    caption = "data from NOAA National Climatic Data Center"
+  )+
+  theme(legend.position = "left")
+
+snow_fall =
+  weather_df %>%
+  filter(snow > 0 & snow < 100) %>%
+  ggplot(aes(x = year, y = snow)) +
+  geom_boxplot(aes(fill = year)) +
+    labs(
+    title = "Snowfall between 0 to 100",
+    x = "Time (year)",
+    y = "Snowfall (mm)",
+    caption = "data from NOAA National Climatic Data Center"
+  ) +
+  theme(legend.position = "none")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+
+tmax_tmin / snow_fall
+
+```
+
