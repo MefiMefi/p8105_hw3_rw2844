@@ -2,7 +2,9 @@
 title: "p8105_hw3_rw2844"
 author: "Renjie Wei"
 date: "2020/10/5"
-output: github_document
+output:
+  github_document:
+    toc: TRUE
 ---
 
 ```{r setup, include = FALSE}
@@ -10,10 +12,11 @@ library(tidyverse)
 library(patchwork)
 knitr::opts_chunk$set(
 	echo = TRUE,
-	warning = FALSE
-	#fig.width = 10, 
-  #fig.height = 8,
-  #out.width = "90%"
+	warning = FALSE,
+	message = FALSE,
+	fig.width = 10, 
+  fig.height = 8,
+  out.width = "90%"
 )
 theme_set(theme_minimal() + theme(legend.position = "bottom"))
 options(
@@ -26,7 +29,7 @@ scale_fill_discrete = scale_fill_viridis_d
 # Problem 1
 
 Read the instacart data:
-```{r datalaoding, results = FALSE}
+```{r dataloading, results = FALSE}
 # read the dataset
 library(p8105.datasets)
 data("instacart")
@@ -38,9 +41,9 @@ The`instracart` dataframe has `r nrow(instacart)` observations and `r ncol(insta
 * `reordered`: if the customer has ordered this item before. 1 for "Yes" and 0 for "No" 
 * `order_number`: the number of times of this user to shop here.     
 * `product` and `aisle`: the item customer bought and the aisle of that product.        
-*`department`: groups of products.     
-*`order_dow`: the day of the week which the item is ordered (0 for "Sunday", which is confusing).     
-*`order_hour_of_the_day`: the hour of the day which this item is ordered.
+* `department`: groups of products.     
+* `order_dow`: the day of the week which the item is ordered (0 for "Sunday", which is confusing).     
+* `order_hour_of_the_day`: the hour of the day which this item is ordered.
 
 ## "popular" aisles
 
@@ -60,8 +63,9 @@ instacart_df =
     )
 ```
 
+Now I'm gonna to find the "top aisles":
 ```{r top_aisles}
-# top 10 aisles
+# top 5 aisles
 instacart_df %>%
   count(aisle, name = "n_items_ordered") %>% 
   arrange(desc(n_items_ordered)) %>% 
@@ -69,9 +73,11 @@ instacart_df %>%
   knitr::kable()
 ```
 
-There are  `r nlevels(pull(instacart_df,aisle))` aisles in the store. And the table above shows the top 5 ordered aisles.       
+There are  `r nlevels(pull(instacart_df,aisle))` aisles in the store. And the table above shows the top 5 ordered aisles, they are `fresh vegetables`, `fresh fruits`, `packaged vegetables fruits`, `yogurt` and `packaged cheese`.       
 
 ## aisles with more than 10000 items
+
+
 ```{r pop_aisle}
 instacart_df %>% 
   count(aisle, name = "n_items_ordered") %>% 
@@ -92,8 +98,11 @@ instacart_df %>%
   scale_x_continuous(
     breaks = c(seq(1, 40, by = 1)),
     labels = c(seq(1, 40, by = 1))
-  )
+  )+
+  theme(legend.position = "left")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
+
 I think a this plot is useful to describe those aisles that has more than 10,000 items ordered (too much). And a decreasing order may be easy for us to read.
 
 ## popular items in three aisles
@@ -108,7 +117,7 @@ instacart_df %>%
   arrange(aisle, rank) %>%
   knitr::kable()
 ```
-The top three popular products in the specific aisle are shown in the table above. 
+The top three popular products in the specific aisles are shown in the table above. 
 
 ## Pink Lady Apples and Coffee Ice Cream
 ```{r filter_prdct}
@@ -160,7 +169,7 @@ acc_df
 
 The `acc_df` has `r nrow(acc_df)` rows and `r ncol(acc_df)` of variables. Variables are `r colnames(acc_df)`:
 
-`week`:the week of the observation, from 1- 5.
+`week`:the week of the observation, from 1 to 5.
 
 `day_id`: the  id of the day of the observation, from 1 to 35 
 
@@ -171,8 +180,10 @@ The `acc_df` has `r nrow(acc_df)` rows and `r ncol(acc_df)` of variables. Variab
 `activity`: indicates the subject's activity status at that minute.
 
 `minute`: the exact minute of the day of observation, from 1 to 1440. 
+
 ## Aggregate accross minutes
 
+Now I'm going to make a table showing the aggregated activity counts:
 ```{r agg_acc}
 acc_df %>% 
   group_by(week,day) %>% 
@@ -189,6 +200,8 @@ acc_df %>%
 There is a increasing activity minutes from Monday to Friday in the first three weeks. And a decrease of activity time from Friday to Saturday. However, from week 4 to week 5, the activity counts drop from weekday to weekend become much bigger.
 
 ## Make a plot using the data
+
+Plot showing the 24-hour activity time courses for each day:
 ```{r confusing_}
 acc_df %>%
   group_by(day, minute) %>% 
@@ -256,7 +269,7 @@ weather_df %>%
   knitr::kable()
    
 ```
-The most observed values are `0` , `25` and `13`, that means there are few snowy days in New York.
+The most observed values are `0`(2008508 observations) , `25`(31002 observations) and `13`(23095 observations), that means there are few snowy days in New York.
 
 ## Average max temperature in Jan and Jul
 
@@ -279,6 +292,7 @@ weather_df %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
+The average temperature in January is lower than the average temperature in July. That makes sense since New York is in Winter during January and Summer during July. The outliers are shown as the dots in the boxplots.
 
 ## tmax vs tmin and snowfall by year
 ```{r tmax_tmin_snw}
@@ -291,21 +305,21 @@ tmax_tmin =
     x = "Max temperature (℃)",
     y = "Min temperature (℃)",
     caption = "data from NOAA National Climatic Data Center"
-  )+
+  ) +
   theme(legend.position = "left")
 
 snow_fall =
   weather_df %>%
   filter(snow > 0 & snow < 100) %>%
   ggplot(aes(x = year, y = snow)) +
-  geom_boxplot(aes(fill = year)) +
+  geom_boxplot() +
     labs(
     title = "Snowfall between 0 to 100",
     x = "Time (year)",
     y = "Snowfall (mm)",
     caption = "data from NOAA National Climatic Data Center"
   ) +
-  theme(legend.position = "none")+
+  theme(legend.position = "none") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 
